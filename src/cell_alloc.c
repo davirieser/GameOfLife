@@ -125,9 +125,9 @@ static struct MemoryIterator to_iter(struct MemoryManager * m) {
 
 // -------------------------------------------------------------------------- //
 
-// Return the next Element as a Pointer
+// Return the next Element as a Pointer.
 // Returns NULL if all Elements where already returned.
-// Resolves Chunk Pointers
+// Resolves Chunk Pointers once it has reached the Chunk Pointer.
 static Inner * next (struct MemoryIterator * i) {
     // Check that the Iterator is still in the allocated Memory.
     if (i->curr_idx < *i->num_elem) {
@@ -152,9 +152,9 @@ static Inner * next (struct MemoryIterator * i) {
 
 // -------------------------------------------------------------------------- //
 
-// Return the next Element as a Pointer
+// Return the next Element as a Pointer while leaving the Iterator unchanged.
 // Returns NULL if all Elements where already returned.
-// Resolves Chunk Pointers
+// Resolves Chunk Pointers.
 static Inner * peek (struct MemoryIterator * i) {
     // Check that the Iterator is still in the allocated Memory.
     if (i->curr_idx <= *(i->num_elem)) {
@@ -167,7 +167,7 @@ static Inner * peek (struct MemoryIterator * i) {
             // Redirect to the next Chunk
             Inner * chunk = (Inner *) i->chunks[CHUNK_POINTER_IDX].CHUNK_POINTER_FIELD;
             #if OUTPUT_REDIRECTION == TRUE
-                printf("Redirecting Chunk to %p\n", i->chunks);
+                printf("Peeking Chunk %p\n", i->chunks);
             #endif
             return &chunk[0];
         }
@@ -195,6 +195,42 @@ static Inner * next_back (struct MemoryIterator * i) {
 
 // -------------------------------------------------------------------------- //
 
+// Return the previous Element as a Pointer while leaving the Iterator unchanged.
+// This works because next does not immidiately resolve Chunk Pointers.
+// Returns NULL if all Elements where already returned.
+// Resolves Chunk Pointers and leaves the Iterator unchanged.
+static Inner * previous (struct MemoryIterator * i) {
+    // Check that the Iterator is still in the allocated Memory.
+    if ((i->curr_idx - 1) < *(i->num_elem)) {
+        // Check if the Index is at the start of the Chunk.
+        if (((i->curr_idx + i->curr_chunk) % CHUNK_SIZE) == 0)
+            return NULL;
+        return &i->chunks[((i->curr_idx - 1) + i->curr_chunk) % CHUNK_SIZE];
+    }
+    return NULL;
+}
+
+// -------------------------------------------------------------------------- //
+
+// TODO: I am too dumb for this rn
+// Skip the specified Amount of Elements.
+// Resolves Chunk Pointers.
+// static void skip (struct MemoryIterator * i, int elems) {
+//     if (elems < 1) return;
+//     int target = i->curr_idx + elems;
+//     if (target < *(i->num_elem)) {
+//         // If target is outside the current Chunk, move to next one
+//         if (target > CHUNK_SIZE) {
+//             // Redirect to the next Chunk
+//             i->chunks = (Inner *) i->chunks[CHUNK_POINTER_IDX].CHUNK_POINTER_FIELD;
+//             i->curr_chunk++;
+//         }
+//
+//     }
+// }
+
+// -------------------------------------------------------------------------- //
+
 static struct MemoryIterator clone_iter (struct MemoryIterator * i) {
     struct MemoryIterator clone = {
         .chunks = i->chunks,
@@ -207,6 +243,17 @@ static struct MemoryIterator clone_iter (struct MemoryIterator * i) {
 
 // -------------------------------------------------------------------------- //
 
+// Call a Closure on each Iterator Element.
+static void for_each (struct MemoryIterator * i, void (*func)(Inner *)) {
+    Inner * inner = next(i);
+    while (inner != NULL) {
+        func(inner);
+        inner = next(i);
+    }
+}
+
+// -------------------------------------------------------------------------- //
+
 //
 struct {
     struct MemoryIterator (*iter)(struct MemoryManager *);
@@ -214,12 +261,16 @@ struct {
     Inner * (*peek) (struct MemoryIterator *);
     Inner * (*next_back) (struct MemoryIterator *);
     struct MemoryIterator (*clone_iter) (struct MemoryIterator * i);
+    Inner * (*previous) (struct MemoryIterator * i);
+    void (*for_each) (struct MemoryIterator * i, void (*func)(Inner *));
 } Iter = {
     .iter = to_iter,
     .next = next,
     .peek = peek,
     .next_back = next_back,
-    .clone_iter = clone_iter
+    .clone_iter = clone_iter,
+    .previous = previous,
+    .for_each = for_each
 };
 
 // -------------------------------------------------------------------------- //

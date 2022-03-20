@@ -1,7 +1,7 @@
 
 // -------------------------------------------------------------------------- //
 
-#if VARIANT == 0
+#if VARIANT == EASY
     struct Cell {
         bool alive;
         // The Neighbour Count can only be a positive Integer from 0 to 8
@@ -10,7 +10,6 @@
     };
 #else
     struct Cell {
-        bool alive;
         // The Neighbour Count can only be a positive Integer from 0 to 8
         // meaning u8 is sufficiently big.
         u8 neighbours;
@@ -21,27 +20,13 @@
 
 // -------------------------------------------------------------------------- //
 
-#if VARIANT == 0
+#if VARIANT == EASY
     struct Cell alive () {
         struct Cell cell;
         cell.alive = true;
         cell.neighbours = 0;
         return cell;
     }
-#else
-    struct Cell alive (long x, long y) {
-        struct Cell cell;
-        cell.alive = true;
-        cell.neighbours = 0;
-        cell.x = x;
-        cell.y = y;
-        return cell;
-    }
-#endif
-
-// -------------------------------------------------------------------------- //
-
-#if VARIANT == 0
     struct Cell dead () {
         struct Cell cell;
         cell.alive = false;
@@ -49,14 +34,15 @@
         return cell;
     }
 #else
-    struct Cell dead (long x, long y) {
+    struct Cell alive (long y, long x) {
         struct Cell cell;
-        cell.alive = false;
         cell.neighbours = 0;
         cell.x = x;
         cell.y = y;
         return cell;
     }
+    // Create a more fitting Alias function
+    struct Cell (*new_cell) (long x, long y) = &alive;
 #endif
 
 // -------------------------------------------------------------------------- //
