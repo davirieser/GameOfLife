@@ -5,8 +5,8 @@ EXE_NAME=game
 
 BUILD_DIR=build/
 
-X=40
-Y=30
+X=50
+Y=50
 DELAY=1
 DENSITY=0.3
 STEPS=100

@@ -54,10 +54,10 @@
         #define OUTPUT_CELL_REMOVE FALSE
     #endif
     #ifndef OUTPUT_NEW_CHUNK
-        #define OUTPUT_NEW_CHUNK   TRUE
+        #define OUTPUT_NEW_CHUNK   FALSE
     #endif
     #ifndef OUTPUT_FREE_CHUNKS
-        #define OUTPUT_FREE_CHUNKS TRUE
+        #define OUTPUT_FREE_CHUNKS FALSE
     #endif
 #endif
 
@@ -449,6 +449,12 @@ int remove_elem (struct MemoryManager * m, long idx) {
     // just decrease the Cell-Count (the next add_cell-Call
     // will overwrite it).
     else if (idx == (m->num_elem - 1)) {
+    #if OUTPUT_CELL_REMOVE == TRUE
+        printf(
+            "Removing last Cell %ld = %p\n",
+            idx, get_elem(*m, m->num_elem - 1)
+        );
+    #endif
         m->num_elem--;
         // If no more Cells remain in the last Chunk deallocate it.
         if ((m->num_elem % CHUNK_POINTER_IDX) == (CHUNK_POINTER_IDX - 1)) {

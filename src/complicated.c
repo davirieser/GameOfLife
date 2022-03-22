@@ -1,3 +1,4 @@
+
 // -------------------------------------------------------------------------- //
 
 #include "cell.c"
@@ -16,6 +17,10 @@
 
 #undef DEBUG
 #define DEBUG TRUE
+
+#ifndef DEBUG
+    #define DEBUG TRUE
+#endif
 #if DEBUG == TRUE
     #define OUTPUT_ITERATOR FALSE
     #define OUTPUT_CREATE_TEMP FALSE
@@ -50,6 +55,23 @@
 
 // -------------------------------------------------------------------------- //
 
+#define stringify(x) #x
+// This Macro can only be used for Cursor Movements known at Compile Time
+#define MOVE_TO(x,y) "\x1B[" stringify(y) ";" stringify(x) "H"
+
+#if TO_STDOUT == TRUE
+    #define PRINT(...) ( \
+        { \
+            printf("\x1B[%d;%dH", curr_row++, board_width + CONS_X_OFFSET); \
+            printf(__VA_ARGS__); \
+        } \
+    )
+#else
+    #define PRINT(...) ({printf(__VA_ARGS__);})
+#endif
+
+// -------------------------------------------------------------------------- //
+
 #define SET_REG(x, num) (x = num)
 #define CLEAR_REG(x) (x = 0)
 
@@ -76,11 +98,14 @@ void change_pos (long * x, long * y, u8 direction);
 void create_temp_cells (struct Cell * self, u8 directions);
 void create_gosper_gun(int x, int y);
 void printUsage(const char* programName);
-void setup_game_board(int height, int width);
-void move_cursor_to(int y, int x);
-void print_char_at(char * color, char c, int x, int y);
-void print_int_at(char * color, int num, int x, int y);
-void print_at(char * str, int x, int y);
+#if TO_STDOUT == TRUE
+    void setup_game_board(int height, int width);
+    void resurrect_cell(u8 count, int x, int y);
+    void kill_cell(u8 count, int x, int y);
+    void temp_cell(u8 count, int x, int y);
+    void alive_cell(u8 count, int x, int y);
+    void dying_cell(u8 count, int x, int y);
+#endif
 
 // -------------------------------------------------------------------------- //
 
@@ -98,10 +123,12 @@ struct MemoryManager temp_cells = {
     .allocated_chunks = 0
 };
 
-// Create Position Variables for Terminal Output
-#if TO_STDOUT
-    long console_x_pos = 0;
-    long console_y_pos = 0;
+#if TO_STDOUT == TRUE
+    #define Y_OFFSET 3
+    #define CONS_X_OFFSET 4
+    int board_height;
+    int board_width;
+    int curr_row = Y_OFFSET;
 #endif
 
 // -------------------------------------------------------------------------- //
@@ -198,31 +225,41 @@ void printUsage(const char* programName) {
         const int height = atoi(argv[2]);
         const int steps = atoi(argv[4]);
 
+        UNUSED(height);
+        UNUSED(width);
+
         // Check if the Steps could be converted and are positive
         if (steps <= 0) {
             printf("Please input a valid number of Steps bigger than 0\n");
-            exit(1);
+            return EXIT_FAILURE;
         }
 
         if (init_chunks(&alive_cells) < 0) exit(1);
         if (init_chunks(&temp_cells) < 0) {
             deallocate_chunks(&alive_cells);
-            exit(1);
+            return EXIT_FAILURE;
         };
 
-        add_elem(&alive_cells, new_cell(1, 1));
-        add_elem(&alive_cells, new_cell(1, 2));
-        add_elem(&alive_cells, new_cell(1, 3));
+        add_elem(&alive_cells, alive(1, 2));
+        add_elem(&alive_cells, alive(1, 3));
+        add_elem(&alive_cells, alive(1, 4));
+
+        add_elem(&alive_cells, alive(10, 4));
+        add_elem(&alive_cells, alive(10, 5));
+        add_elem(&alive_cells, alive(10, 6));
 
         #if TO_STDOUT == TRUE
-            printf("\x1B[?1049h\x1B[?25l");
+            board_height = height;
+            board_width = width * 2;
             setup_game_board(height, width);
         #endif
 
         main_loop(steps);
 
-        // Restore Terminal Output and show the cursor again
-        printf("\x1B[?1049l\x1B[?25h");
+        #if TO_STDOUT == TRUE
+            // Restore Terminal Output and show the cursor again
+            printf("\x1B[?1049l\x1B[?25h");
+        #endif
 
         deallocate_chunks(&alive_cells);
         deallocate_chunks(&temp_cells);
@@ -346,7 +383,11 @@ void main_loop (const int steps) {
         curr_cell = Iter.next(&alive_iterator);
         // Start new Round
         step_counter ++;
-        printf(BLUE "\x1B[0;0HRound %d\n" DEFAULT, step_counter);
+        #if TO_STDOUT == TRUE
+            printf(MOVE_TO(0, 0) RED "\nRound %d:\n" DEFAULT, step_counter);
+        #else
+            printf(RED "\nRound %d:\n" DEFAULT, step_counter);
+        #endif
 
 // -------------------------------------------------------------------------- //
 
@@ -358,17 +399,11 @@ void main_loop (const int steps) {
             // Get the current Cells Neighbour Count (reset when checking if Cell is alive)
             curr_neighbours = curr_cell->neighbours;
             #if OUTPUT_ITERATOR == TRUE
-                #if TO_STDOUT == TRUE
-                    move_cursor_to(console_y_pos++ % height, console_x_pos);
-                #endif
-                printf(GREEN "Current Cell (%ld): %p (%ld, %ld)\n", alive_iterator.curr_idx, curr_cell, curr_cell->y, curr_cell->x);
+                PRINT(GREEN "Current Cell (%ld): %p (%ld, %ld)\n", alive_iterator.curr_idx, curr_cell, curr_cell->y, curr_cell->x);
             #endif
             while (cmp_cell != NULL) {
                 #if OUTPUT_COMPARE == TRUE
-                    #if TO_STDOUT == TRUE
-                        move_cursor_to(console_y_pos++ % height, console_x_pos);
-                    #endif
-                    printf(YELLOW "\tCompare Cell: %p (%ld, %ld)\n", cmp_cell ,cmp_cell->y, cmp_cell->x);
+                    PRINT(YELLOW "\tCompare Cell: %p (%ld, %ld)\n", cmp_cell ,cmp_cell->y, cmp_cell->x);
                 #endif
                 // Compare Cells
                 if ((direction = compare_cells(curr_cell, cmp_cell)) == -1) {
@@ -395,7 +430,7 @@ void main_loop (const int steps) {
             cmp_cell = Iter.next(&curr_iter);
             while (cmp_cell != NULL) {
                 #if OUTPUT_COMPARE == TRUE
-                    printf(YELLOW "\tCompare Cell: %p (%ld, %ld)\n", cmp_cell ,cmp_cell->y, cmp_cell->x);
+                    PRINT(YELLOW "\tCompare Cell: %p (%ld, %ld)\n", cmp_cell ,cmp_cell->y, cmp_cell->x);
                 #endif
                 // Compare Cells
                 if ((direction = compare_cells(curr_cell, cmp_cell)) == -1) {
@@ -432,30 +467,19 @@ void main_loop (const int steps) {
                 // Reset Cells Neighbour Count
                 curr_cell->neighbours = 0;
                 #if TO_STDOUT == TRUE
-                    #if DEBUG == TRUE
-                        print_char_at(GREEN, 't', curr_cell->y, curr_cell->x);
-                    #else
-                        print_int_at(GREEN, curr_cell->neighbours, curr_cell->y, curr_cell->x);
-                    #endif
+                    resurrect_cell(num_bits, curr_cell->y, curr_cell->x);
                 #endif
-                #if OUTPUT_REVIVE_CELLS
-                    printf("\t\tSurviving Cell: (%ld, %ld) %d\n", curr_cell->y, curr_cell->x, num_bits);
+                #if OUTPUT_REVIVE_CELLS == TRUE
+                    PRINT("\t\tSurviving Cell: (%ld, %ld) %d\n", curr_cell->y, curr_cell->x, num_bits);
                 #endif
                 // Get the next Cell
                 curr_cell = Iter.next(&curr_iter);
             } else {
+                #if TO_STDOUT == TRUE
+                    dying_cell(num_bits, curr_cell->y, curr_cell->x);
+                #endif
                 // Unalive the Cell
                 remove_elem(&alive_cells, curr_iter.curr_idx - 1);
-                #if TO_STDOUT == TRUE
-                    #if DEBUG == TRUE
-                        print_char_at(RED, 'f', curr_cell->y, curr_cell->x);
-                    #else
-                        print_int_at(RED, curr_cell->neighbours, curr_cell->y, curr_cell->x);
-                    #endif
-                #endif
-                #if OUTPUT_KILL_CELLS
-                    printf("\t\tKilling Cell: (%ld, %ld) %d\n", curr_cell->y, curr_cell->x, num_bits);
-                #endif
                 // Get the Cell at the same place which replaced the old one
                 curr_cell = Iter.previous(&curr_iter);
             }
@@ -469,22 +493,22 @@ void main_loop (const int steps) {
         while (curr_cell != NULL) {
             num_bits = count_set_bits(*curr_cell);
             if (num_bits == 3) {
+                #if TO_STDOUT == TRUE
+                    alive_cell(num_bits, curr_cell->y, curr_cell->x);
+                #endif
                 // Reset Cells Neighbour Count
                 curr_cell->neighbours = 0;
                 add_elem(&alive_cells, *curr_cell);
-                #if TO_STDOUT == TRUE
-                    print_char_at(GREEN, 't', curr_cell->y, curr_cell->x);
-                #endif
                 #if OUTPUT_REVIVE_CELLS
-                    printf("\t\tRessurecting Cell (%ld, %ld) %d\n", curr_cell->y, curr_cell->x, num_bits);
+                    PRINT("\t\tRessurecting Cell (%ld, %ld) %d\n", curr_cell->y, curr_cell->x, num_bits);
+                #endif
+            } else {
+                #if TO_STDOUT == TRUE
+                    temp_cell(num_bits, curr_cell->y, curr_cell->x);
                 #endif
             }
             curr_cell = Iter.next(&curr_iter);
         }
-        // Reset Temporary Cells
-        // TODO: Implement a Function for removing all Elements because this
-        // does not deallocate any chunks, which could become a Problem.
-        temp_cells.num_elem = 0;
 
         #if TO_STDOUT == TRUE
             #if DEBUG == TRUE
@@ -494,6 +518,20 @@ void main_loop (const int steps) {
             #endif
         #endif
 
+        #if TO_STDOUT == TRUE
+            // TODO: Clear previous Console Output
+            curr_row = Y_OFFSET;
+            curr_iter = Iter.iter(&temp_cells);
+            curr_cell = Iter.next(&curr_iter);
+            while (curr_cell != NULL) {
+                kill_cell(0, curr_cell->y, curr_cell->x);
+                curr_cell = Iter.next(&curr_iter);
+            }
+        #endif
+
+        // Reset Temporary Cells
+        temp_cells.num_elem = 0;
+
     }
 
 }
@@ -501,7 +539,9 @@ void main_loop (const int steps) {
 // -------------------------------------------------------------------------- //
 
 // Test if Cells are neighbours
-// If they are neighbours, indicate as such in their Neighbour Fields
+// Returns 0 if they are not Neighbours
+// Returns -1 if the Cells are on the same Position
+// Returns the Direction from Cell self to Cell other if they are Neighbours
 int compare_cells (struct Cell * self, struct Cell * other) {
     int neighbour = is_neighbour(*self, *other);
     switch (neighbour) {
@@ -515,7 +555,7 @@ int compare_cells (struct Cell * self, struct Cell * other) {
         default:
             // Cells are neighbours
             #if OUTPUT_NEIGHBOURS == TRUE
-                printf(BLUE "\t\tNeighbours: (%ld, %ld) (%ld, %ld) : %s => %s\n",
+                PRINT(BLUE "\t\tNeighbours: (%ld, %ld) (%ld, %ld) : %s => %s\n",
                     self->y, self->x, other->y, other->x,
                     direction_to_string(neighbour),
                     direction_to_string(reverse_direction(neighbour))
@@ -534,24 +574,31 @@ void create_temp_cells (struct Cell * self, u8 directions) {
     u8 reverse;
     long x, y;
 
+    // Loop through all direction Bits
     while (bitmask <= 255) {
 
+        // Check if the Bit is not set => No alive Neighbour
+        // was found in that direction.
         if (!(directions & bitmask)) {
 
             x = self->x;
             y = self->y;
 
+            // Get the opposite Direction (UP => DOWN)
             reverse = reverse_direction(bitmask);
 
+            // Get the new Cells Position
             change_pos(&x, &y, reverse);
 
+            // Create new Temporary Cell
             struct Cell c = new_cell(y, x);
+            // Set the Neighbour Field in that Cell
             c.neighbours = reverse;
 
             add_elem(&temp_cells, c);
 
             #if OUTPUT_CREATE_TEMP == TRUE
-                printf(GREEN "\t\t\tCreating Temp Cell at (%ld, %ld)\n", y, x);
+                PRINT(GREEN "\t\t\tCreating Temp Cell at (%ld, %ld)\n", y, x);
             #endif
 
         }
@@ -651,120 +698,97 @@ int count_set_bits(struct Cell cell) {
 
 // -------------------------------------------------------------------------- //
 
-void setup_game_board(int height, int width) {
-    // Setup Console Position
-    console_x_pos = width + 5;
-    console_y_pos = 3;
-    // Print Round Identifier
-    printf(BLUE "Round 0:\n\n");
-    // Setup Game Board
-    for (int i = 0; i < height; i ++) {
-        for (int j = 0; j < width; j ++) {
-            #if DEBUG == TRUE
-                printf(RED " 0");
-            #else
-                printf(RED " f");
-            #endif
+#if TO_STDOUT == TRUE
+    void setup_game_board(int height, int width) {
+        printf("\x1B[?1049h\x1B[?25l");
+        // Print Round Identifier
+        printf(MOVE_TO(0, 0) BLUE "Round 0:\n\n");
+        // Setup Game Board
+        for (int i = 0; i < height; i ++) {
+            for (int j = 0; j < width; j ++) {
+                #if DEBUG == TRUE
+                    printf(RED " 0");
+                #else
+                    printf(RED " f");
+                #endif
+            }
+            printf("\n");
         }
-        printf("\n");
-    }
-    // Print initial Cells
-    struct MemoryIterator alive_iterator = Iter.iter(&alive_cells);
-    struct Cell * c = Iter.next(&alive_iterator);
-    while (c != NULL) {
-        if (
-            (c->x >= 0) && (c->x < width) &&
-            (c->y >= 0) && (c->y < height)
-        ) {
-            #if DEBUG == TRUE
-                print_int_at(GREEN, c->neighbours, c->y, c->x);
-            #else
-                print_char_at(GREEN, 't', c->y, c->x);
-            #endif
+        // Print initial Cells
+        struct MemoryIterator alive_iterator = Iter.iter(&alive_cells);
+        struct Cell * c = Iter.next(&alive_iterator);
+        while (c != NULL) {
+            if (
+                (c->x >= 0) && (c->x < width) &&
+                (c->y >= 0) && (c->y < height)
+            ) {
+                resurrect_cell(c->neighbours, c->y, c->y);
+            }
+            c = Iter.next(&alive_iterator);
         }
-        c = Iter.next(&alive_iterator);
     }
-}
 
 // -------------------------------------------------------------------------- //
 
-void move_cursor_to(int y, int x) {
-    printf("\x1B[%d;%dH", y, x);
-}
+    #if DEBUG == TRUE
+        void dying_cell(u8 count, int x, int y) {
+            if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
+                printf("\x1B[%d;%dH" BLUE " %d", y + Y_OFFSET, (x * 2) + 1, count);
+            }
+        }
+        void alive_cell(u8 count, int x, int y) {
+            if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
+                printf("\x1B[%d;%dH" GREEN " %d", y + Y_OFFSET, (x * 2) + 1, count);
+            }
+        }
+        void resurrect_cell(u8 count, int x, int y) {
+            if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
+                printf("\x1B[%d;%dH" GREEN " %d", y + Y_OFFSET, (x * 2) + 1, count);
+            }
+        }
+        void kill_cell(u8 count, int x, int y) {
+            if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
+                printf("\x1B[%d;%dH" RED " %d", y + Y_OFFSET, (x * 2) + 1, count);
+            }
+        }
+        void temp_cell(u8 count, int x, int y) {
+            if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
+                printf("\x1B[%d;%dH" YELLOW " %d", y + Y_OFFSET, (x * 2) + 1, count);
+            }
+        }
+    #else
+        void dying_cell(u8 count, int x, int y) {
+            UNUSED(count);
+            if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
+                printf("\x1B[%d;%dH" BLUE " t", y + Y_OFFSET, (x * 2) + 1);
+            }
+        }
+        void alive_cell(u8 count, int x, int y) {
+            UNUSED(count);
+            if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
+                printf("\x1B[%d;%dH" GREEN " t", y + Y_OFFSET, (x * 2) + 1);
+            }
+        }
+        void resurrect_cell(u8 count, int x, int y) {
+            UNUSED(count);
+            if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
+                printf("\x1B[%d;%dH" GREEN " t", y + Y_OFFSET, (x * 2) + 1);
+            }
+        }
+        void kill_cell(u8 count, int x, int y) {
+            UNUSED(count);
+            if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
+                printf("\x1B[%d;%dH" RED " f", y + Y_OFFSET, (x * 2) + 1);
+            }
+        }
+        void temp_cell(u8 count, int x, int y) {
+            UNUSED(count);
+            if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
+                printf("\x1B[%d;%dH" YELLOW " x", y + Y_OFFSET, (x * 2) + 1);
+            }
+        }
+    #endif
 
-// -------------------------------------------------------------------------- //
-
-void print_char_at(char * color, char c, int x, int y) {
-    printf("\x1B[%d;%dH%s %c", y + 3, (x * 2) + 1, color, c);
-}
-
-// -------------------------------------------------------------------------- //
-
-void print_int_at(char * color, int num, int x, int y) {
-    printf("\x1B[%d;%dH%s %d", y + 3, (x * 2) + 1, color, num);
-}
-
-// -------------------------------------------------------------------------- //
-
-void print_at(char * str, int x, int y) {
-    printf("\x1B[%d;%dH %s", y + 3, (x * 2) + 1, str);
-}
-
-// -------------------------------------------------------------------------- //
-
-// Create a Gosper Gun at the Location specified by x and y in the Cell Array
-void create_gosper_gun(int x, int y) {
-
-    add_elem(&alive_cells, new_cell(4+y, 0+x));
-    add_elem(&alive_cells, new_cell(5+y, 0+x));
-    add_elem(&alive_cells, new_cell(4+y, 1+x));
-    add_elem(&alive_cells, new_cell(5+y, 1+x));
-
-    add_elem(&alive_cells, new_cell(4+y, 10+x));
-    add_elem(&alive_cells, new_cell(5+y, 10+x));
-    add_elem(&alive_cells, new_cell(6+y, 10+x));
-
-    add_elem(&alive_cells, new_cell(3+y, 11+x));
-    add_elem(&alive_cells, new_cell(7+y, 11+x));
-
-    add_elem(&alive_cells, new_cell(2+y, 12+x));
-    add_elem(&alive_cells, new_cell(8+y, 12+x));
-
-    add_elem(&alive_cells, new_cell(2+y, 13+x));
-    add_elem(&alive_cells, new_cell(8+y, 13+x));
-
-    add_elem(&alive_cells, new_cell(5+y, 14+x));
-
-    add_elem(&alive_cells, new_cell(3+y, 15+x));
-    add_elem(&alive_cells, new_cell(7+y, 15+x));
-
-    add_elem(&alive_cells, new_cell(4+y, 16+x));
-    add_elem(&alive_cells, new_cell(5+y, 16+x));
-    add_elem(&alive_cells, new_cell(6+y, 16+x));
-
-    add_elem(&alive_cells, new_cell(5+y, 17+x));
-
-    add_elem(&alive_cells, new_cell(2+y, 20+x));
-    add_elem(&alive_cells, new_cell(3+y, 20+x));
-    add_elem(&alive_cells, new_cell(4+y, 20+x));
-
-    add_elem(&alive_cells, new_cell(2+y, 21+x));
-    add_elem(&alive_cells, new_cell(3+y, 21+x));
-    add_elem(&alive_cells, new_cell(4+y, 21+x));
-
-    add_elem(&alive_cells, new_cell(1+y, 22+x));
-    add_elem(&alive_cells, new_cell(5+y, 22+x));
-
-    add_elem(&alive_cells, new_cell(0+y, 24+x));
-    add_elem(&alive_cells, new_cell(1+y, 24+x));
-    add_elem(&alive_cells, new_cell(5+y, 24+x));
-    add_elem(&alive_cells, new_cell(6+y, 24+x));
-
-    add_elem(&alive_cells, new_cell(2+y, 34+x));
-    add_elem(&alive_cells, new_cell(3+y, 34+x));
-    add_elem(&alive_cells, new_cell(2+y, 35+x));
-    add_elem(&alive_cells, new_cell(3+y, 35+x));
-
-}
+#endif
 
 // -------------------------------------------------------------------------- //
