@@ -12,12 +12,17 @@
 
 // -------------------------------------------------------------------------- //
 
+#define TO_STDOUT TRUE
+
+#undef DEBUG
+#define DEBUG TRUE
 #if DEBUG == TRUE
-    #define OUTPUT_ITERATOR TRUE
+    #define OUTPUT_ITERATOR FALSE
     #define OUTPUT_CREATE_TEMP FALSE
     #define OUTPUT_REVIVE_CELLS TRUE
-    #define OUTPUT_COMPARE TRUE
-    #define OUTPUT_NEIGHBOURS TRUE
+    #define OUTPUT_KILL_CELLS TRUE
+    #define OUTPUT_COMPARE FALSE
+    #define OUTPUT_NEIGHBOURS FALSE
 #endif
 
 // -------------------------------------------------------------------------- //
@@ -69,6 +74,13 @@ void direction_test ();
 int compare_cells (struct Cell * self, struct Cell * other);
 void change_pos (long * x, long * y, u8 direction);
 void create_temp_cells (struct Cell * self, u8 directions);
+void create_gosper_gun(int x, int y);
+void printUsage(const char* programName);
+void setup_game_board(int height, int width);
+void move_cursor_to(int y, int x);
+void print_char_at(char * color, char c, int x, int y);
+void print_int_at(char * color, int num, int x, int y);
+void print_at(char * str, int x, int y);
 
 // -------------------------------------------------------------------------- //
 
@@ -85,6 +97,12 @@ struct MemoryManager temp_cells = {
     .num_elem = 0,
     .allocated_chunks = 0
 };
+
+// Create Position Variables for Terminal Output
+#if TO_STDOUT
+    long console_x_pos = 0;
+    long console_y_pos = 0;
+#endif
 
 // -------------------------------------------------------------------------- //
 
@@ -156,15 +174,28 @@ const char * direction_to_string (u8 direction) {
 
 // -------------------------------------------------------------------------- //
 
+void printUsage(const char* programName) {
+    printf("usage: %s <width> <height> <density> <steps>\n", programName);
+}
+
+// -------------------------------------------------------------------------- //
+
 // TEST is set/defined via the Command Line using <gcc complicated.c -DTEST>
 #ifndef TEST
 
     int game_of_life(int argc, char* argv[]) {
 
+        if(argc != 5) {
+            printUsage(argv[0]);
+            return EXIT_FAILURE;
+        }
+
         UNUSED(argc);
         UNUSED(argv);
 
         // atoi returns 0 if it could not convert the number.
+        const int width = atoi(argv[1]);
+        const int height = atoi(argv[2]);
         const int steps = atoi(argv[4]);
 
         // Check if the Steps could be converted and are positive
@@ -183,12 +214,20 @@ const char * direction_to_string (u8 direction) {
         add_elem(&alive_cells, new_cell(1, 2));
         add_elem(&alive_cells, new_cell(1, 3));
 
+        #if TO_STDOUT == TRUE
+            printf("\x1B[?1049h\x1B[?25l");
+            setup_game_board(height, width);
+        #endif
+
         main_loop(steps);
+
+        // Restore Terminal Output and show the cursor again
+        printf("\x1B[?1049l\x1B[?25h");
 
         deallocate_chunks(&alive_cells);
         deallocate_chunks(&temp_cells);
 
-        return 0;
+        return EXIT_SUCCESS;
 
     }
 
@@ -307,18 +346,7 @@ void main_loop (const int steps) {
         curr_cell = Iter.next(&alive_iterator);
         // Start new Round
         step_counter ++;
-        printf(RED "\nRound %d\n" DEFAULT, step_counter);
-
-        // TODO: Implement Graphic Interface
-        #if DEBUG == FALSE
-            while (curr_cell != NULL) {
-                printf(GREEN "\tCell %ld (%ld, %ld)\n", alive_iterator.curr_idx, curr_cell->y, curr_cell->x);
-                curr_cell = Iter.next(&alive_iterator);
-            }
-            // Reset Alive Cell Iterator
-            alive_iterator = Iter.iter(&alive_cells);
-            curr_cell = Iter.next(&alive_iterator);
-        #endif
+        printf(BLUE "\x1B[0;0HRound %d\n" DEFAULT, step_counter);
 
 // -------------------------------------------------------------------------- //
 
@@ -330,10 +358,16 @@ void main_loop (const int steps) {
             // Get the current Cells Neighbour Count (reset when checking if Cell is alive)
             curr_neighbours = curr_cell->neighbours;
             #if OUTPUT_ITERATOR == TRUE
+                #if TO_STDOUT == TRUE
+                    move_cursor_to(console_y_pos++ % height, console_x_pos);
+                #endif
                 printf(GREEN "Current Cell (%ld): %p (%ld, %ld)\n", alive_iterator.curr_idx, curr_cell, curr_cell->y, curr_cell->x);
             #endif
             while (cmp_cell != NULL) {
                 #if OUTPUT_COMPARE == TRUE
+                    #if TO_STDOUT == TRUE
+                        move_cursor_to(console_y_pos++ % height, console_x_pos);
+                    #endif
                     printf(YELLOW "\tCompare Cell: %p (%ld, %ld)\n", cmp_cell ,cmp_cell->y, cmp_cell->x);
                 #endif
                 // Compare Cells
@@ -397,14 +431,31 @@ void main_loop (const int steps) {
             if ((num_bits == 2) || (num_bits == 3)) {
                 // Reset Cells Neighbour Count
                 curr_cell->neighbours = 0;
-                // Get the next Cell
-                curr_cell = Iter.next(&curr_iter);
+                #if TO_STDOUT == TRUE
+                    #if DEBUG == TRUE
+                        print_char_at(GREEN, 't', curr_cell->y, curr_cell->x);
+                    #else
+                        print_int_at(GREEN, curr_cell->neighbours, curr_cell->y, curr_cell->x);
+                    #endif
+                #endif
                 #if OUTPUT_REVIVE_CELLS
                     printf("\t\tSurviving Cell: (%ld, %ld) %d\n", curr_cell->y, curr_cell->x, num_bits);
                 #endif
+                // Get the next Cell
+                curr_cell = Iter.next(&curr_iter);
             } else {
                 // Unalive the Cell
                 remove_elem(&alive_cells, curr_iter.curr_idx - 1);
+                #if TO_STDOUT == TRUE
+                    #if DEBUG == TRUE
+                        print_char_at(RED, 'f', curr_cell->y, curr_cell->x);
+                    #else
+                        print_int_at(RED, curr_cell->neighbours, curr_cell->y, curr_cell->x);
+                    #endif
+                #endif
+                #if OUTPUT_KILL_CELLS
+                    printf("\t\tKilling Cell: (%ld, %ld) %d\n", curr_cell->y, curr_cell->x, num_bits);
+                #endif
                 // Get the Cell at the same place which replaced the old one
                 curr_cell = Iter.previous(&curr_iter);
             }
@@ -421,6 +472,9 @@ void main_loop (const int steps) {
                 // Reset Cells Neighbour Count
                 curr_cell->neighbours = 0;
                 add_elem(&alive_cells, *curr_cell);
+                #if TO_STDOUT == TRUE
+                    print_char_at(GREEN, 't', curr_cell->y, curr_cell->x);
+                #endif
                 #if OUTPUT_REVIVE_CELLS
                     printf("\t\tRessurecting Cell (%ld, %ld) %d\n", curr_cell->y, curr_cell->x, num_bits);
                 #endif
@@ -431,6 +485,14 @@ void main_loop (const int steps) {
         // TODO: Implement a Function for removing all Elements because this
         // does not deallocate any chunks, which could become a Problem.
         temp_cells.num_elem = 0;
+
+        #if TO_STDOUT == TRUE
+            #if DEBUG == TRUE
+                getchar();
+            #else
+                sleep(1);
+            #endif
+        #endif
 
     }
 
@@ -584,6 +646,124 @@ int count_set_bits(struct Cell cell) {
     }
 
     return count;
+
+}
+
+// -------------------------------------------------------------------------- //
+
+void setup_game_board(int height, int width) {
+    // Setup Console Position
+    console_x_pos = width + 5;
+    console_y_pos = 3;
+    // Print Round Identifier
+    printf(BLUE "Round 0:\n\n");
+    // Setup Game Board
+    for (int i = 0; i < height; i ++) {
+        for (int j = 0; j < width; j ++) {
+            #if DEBUG == TRUE
+                printf(RED " 0");
+            #else
+                printf(RED " f");
+            #endif
+        }
+        printf("\n");
+    }
+    // Print initial Cells
+    struct MemoryIterator alive_iterator = Iter.iter(&alive_cells);
+    struct Cell * c = Iter.next(&alive_iterator);
+    while (c != NULL) {
+        if (
+            (c->x >= 0) && (c->x < width) &&
+            (c->y >= 0) && (c->y < height)
+        ) {
+            #if DEBUG == TRUE
+                print_int_at(GREEN, c->neighbours, c->y, c->x);
+            #else
+                print_char_at(GREEN, 't', c->y, c->x);
+            #endif
+        }
+        c = Iter.next(&alive_iterator);
+    }
+}
+
+// -------------------------------------------------------------------------- //
+
+void move_cursor_to(int y, int x) {
+    printf("\x1B[%d;%dH", y, x);
+}
+
+// -------------------------------------------------------------------------- //
+
+void print_char_at(char * color, char c, int x, int y) {
+    printf("\x1B[%d;%dH%s %c", y + 3, (x * 2) + 1, color, c);
+}
+
+// -------------------------------------------------------------------------- //
+
+void print_int_at(char * color, int num, int x, int y) {
+    printf("\x1B[%d;%dH%s %d", y + 3, (x * 2) + 1, color, num);
+}
+
+// -------------------------------------------------------------------------- //
+
+void print_at(char * str, int x, int y) {
+    printf("\x1B[%d;%dH %s", y + 3, (x * 2) + 1, str);
+}
+
+// -------------------------------------------------------------------------- //
+
+// Create a Gosper Gun at the Location specified by x and y in the Cell Array
+void create_gosper_gun(int x, int y) {
+
+    add_elem(&alive_cells, new_cell(4+y, 0+x));
+    add_elem(&alive_cells, new_cell(5+y, 0+x));
+    add_elem(&alive_cells, new_cell(4+y, 1+x));
+    add_elem(&alive_cells, new_cell(5+y, 1+x));
+
+    add_elem(&alive_cells, new_cell(4+y, 10+x));
+    add_elem(&alive_cells, new_cell(5+y, 10+x));
+    add_elem(&alive_cells, new_cell(6+y, 10+x));
+
+    add_elem(&alive_cells, new_cell(3+y, 11+x));
+    add_elem(&alive_cells, new_cell(7+y, 11+x));
+
+    add_elem(&alive_cells, new_cell(2+y, 12+x));
+    add_elem(&alive_cells, new_cell(8+y, 12+x));
+
+    add_elem(&alive_cells, new_cell(2+y, 13+x));
+    add_elem(&alive_cells, new_cell(8+y, 13+x));
+
+    add_elem(&alive_cells, new_cell(5+y, 14+x));
+
+    add_elem(&alive_cells, new_cell(3+y, 15+x));
+    add_elem(&alive_cells, new_cell(7+y, 15+x));
+
+    add_elem(&alive_cells, new_cell(4+y, 16+x));
+    add_elem(&alive_cells, new_cell(5+y, 16+x));
+    add_elem(&alive_cells, new_cell(6+y, 16+x));
+
+    add_elem(&alive_cells, new_cell(5+y, 17+x));
+
+    add_elem(&alive_cells, new_cell(2+y, 20+x));
+    add_elem(&alive_cells, new_cell(3+y, 20+x));
+    add_elem(&alive_cells, new_cell(4+y, 20+x));
+
+    add_elem(&alive_cells, new_cell(2+y, 21+x));
+    add_elem(&alive_cells, new_cell(3+y, 21+x));
+    add_elem(&alive_cells, new_cell(4+y, 21+x));
+
+    add_elem(&alive_cells, new_cell(1+y, 22+x));
+    add_elem(&alive_cells, new_cell(5+y, 22+x));
+
+    add_elem(&alive_cells, new_cell(0+y, 24+x));
+    add_elem(&alive_cells, new_cell(1+y, 24+x));
+    add_elem(&alive_cells, new_cell(5+y, 24+x));
+    add_elem(&alive_cells, new_cell(6+y, 24+x));
+
+    add_elem(&alive_cells, new_cell(2+y, 34+x));
+    add_elem(&alive_cells, new_cell(3+y, 34+x));
+    add_elem(&alive_cells, new_cell(2+y, 35+x));
+    add_elem(&alive_cells, new_cell(3+y, 35+x));
 
 }
 

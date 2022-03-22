@@ -292,7 +292,7 @@ Inner * get_elem (struct MemoryManager m, long idx);
 static Inner * get_elem_inner (Inner * c, long idx);
 Inner * get_chunk_pointer (struct MemoryManager m, long idx);
 static Inner * get_chunk_pointer_inner (Inner * c, long idx);
-void print_chunks(struct MemoryManager m);
+void print_chunks(struct MemoryManager m, char * (*display)(Inner));
 void print_chunk_pointers(struct MemoryManager m);
 
 // -------------------------------------------------------------------------- //
@@ -537,7 +537,7 @@ static Inner * get_chunk_pointer_inner (Inner * c, long idx) {
 
 // -------------------------------------------------------------------------- //
 
-void print_chunks(struct MemoryManager m){
+void print_chunks(struct MemoryManager m, char * (*display)(Inner)){
 
     Inner * chunks = m.chunks;
     long idx;
@@ -564,11 +564,8 @@ void print_chunks(struct MemoryManager m){
             printf("] -> %p -> [\n", chunks);
             continue;
         }
-        // NOTE: This should probably be done differently since this
-        //       Type can be any struct with different Fields.
-        //       => Rust Display Trait would be great right now lul.
-        printf("\t%-3ld: %p -> (%ld, %ld), \n",
-            iLauf - chunk_idx + 1, &chunks[idx], chunks[idx].x, chunks[idx].y
+        printf("\t%-3ld: %p -> %s, \n",
+            iLauf - chunk_idx + 1, chunks + idx, display(chunks[idx])
         );
     }
 
