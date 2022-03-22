@@ -16,7 +16,7 @@
 #define TO_STDOUT TRUE
 
 #undef DEBUG
-#define DEBUG TRUE
+#define DEBUG FALSE
 
 #ifndef DEBUG
     #define DEBUG TRUE
@@ -58,6 +58,7 @@
 #define stringify(x) #x
 // This Macro can only be used for Cursor Movements known at Compile Time
 #define MOVE_TO(x,y) "\x1B[" stringify(y) ";" stringify(x) "H"
+#define CLEAR_TO_EOL "\x1B[0K"
 
 #if TO_STDOUT == TRUE
     #define PRINT(...) ( \
@@ -110,7 +111,7 @@ void printUsage(const char* programName);
 // -------------------------------------------------------------------------- //
 
 // Since this is not multithreaded, I will declare these as global, so I
-// don't need to pass them down through each function
+// don't need to pass them down through each function.
 struct MemoryManager alive_cells = {
     .chunks = 0 ,
     .num_elem = 0,
@@ -225,6 +226,7 @@ void printUsage(const char* programName) {
         const int height = atoi(argv[2]);
         const int steps = atoi(argv[4]);
 
+        // I hate those goddamn Falgs
         UNUSED(height);
         UNUSED(width);
 
@@ -234,12 +236,20 @@ void printUsage(const char* programName) {
             return EXIT_FAILURE;
         }
 
+        // Initialize Chunks
         if (init_chunks(&alive_cells) < 0) exit(1);
         if (init_chunks(&temp_cells) < 0) {
             deallocate_chunks(&alive_cells);
             return EXIT_FAILURE;
         };
 
+        #if TO_STDOUT == TRUE
+            board_height = height;
+            board_width = width * 2;
+            setup_game_board(height, width);
+        #endif
+
+        // Create some Patterns
         add_elem(&alive_cells, alive(1, 2));
         add_elem(&alive_cells, alive(1, 3));
         add_elem(&alive_cells, alive(1, 4));
@@ -248,11 +258,17 @@ void printUsage(const char* programName) {
         add_elem(&alive_cells, alive(10, 5));
         add_elem(&alive_cells, alive(10, 6));
 
-        #if TO_STDOUT == TRUE
-            board_height = height;
-            board_width = width * 2;
-            setup_game_board(height, width);
-        #endif
+        add_elem(&alive_cells, alive(17, 4));
+        add_elem(&alive_cells, alive(17, 5));
+        add_elem(&alive_cells, alive(18, 4));
+        add_elem(&alive_cells, alive(18, 5));
+
+        // TODO: Something is wrong when trying to use a Glider:
+        // add_elem(&alive_cells, alive(4, 8));
+        // add_elem(&alive_cells, alive(5, 9));
+        // add_elem(&alive_cells, alive(6, 8));
+        // add_elem(&alive_cells, alive(6, 9));
+        // add_elem(&alive_cells, alive(6, 10));
 
         main_loop(steps);
 
@@ -261,6 +277,7 @@ void printUsage(const char* programName) {
             printf("\x1B[?1049l\x1B[?25h");
         #endif
 
+        // Safely deallocate Chunks
         deallocate_chunks(&alive_cells);
         deallocate_chunks(&temp_cells);
 
@@ -270,6 +287,7 @@ void printUsage(const char* programName) {
 
 #else
 
+    // Tests for the MemoryManager and the Direction Enum
     int game_of_life(int argc, char* argv[]) {
 
         UNUSED(argc);
@@ -320,6 +338,7 @@ void printUsage(const char* programName) {
 
 // -------------------------------------------------------------------------- //
 
+    // Tests for the Direction Enum
     void direction_test () {
         u8 directions[8] = {
             DIRECTION.UP, DIRECTION.DOWN, DIRECTION.RIGHT,
@@ -384,7 +403,7 @@ void main_loop (const int steps) {
         // Start new Round
         step_counter ++;
         #if TO_STDOUT == TRUE
-            printf(MOVE_TO(0, 0) RED "\nRound %d:\n" DEFAULT, step_counter);
+            printf(MOVE_TO(1, 1) RED "\nRound %d:\n" DEFAULT, step_counter);
         #else
             printf(RED "\nRound %d:\n" DEFAULT, step_counter);
         #endif
@@ -464,14 +483,14 @@ void main_loop (const int steps) {
         while (curr_cell != NULL) {
             num_bits = count_set_bits(*curr_cell);
             if ((num_bits == 2) || (num_bits == 3)) {
-                // Reset Cells Neighbour Count
-                curr_cell->neighbours = 0;
                 #if TO_STDOUT == TRUE
                     resurrect_cell(num_bits, curr_cell->y, curr_cell->x);
                 #endif
                 #if OUTPUT_REVIVE_CELLS == TRUE
                     PRINT("\t\tSurviving Cell: (%ld, %ld) %d\n", curr_cell->y, curr_cell->x, num_bits);
                 #endif
+                // Reset Cells Neighbour Count
+                curr_cell->neighbours = 0;
                 // Get the next Cell
                 curr_cell = Iter.next(&curr_iter);
             } else {
@@ -496,12 +515,13 @@ void main_loop (const int steps) {
                 #if TO_STDOUT == TRUE
                     alive_cell(num_bits, curr_cell->y, curr_cell->x);
                 #endif
-                // Reset Cells Neighbour Count
-                curr_cell->neighbours = 0;
-                add_elem(&alive_cells, *curr_cell);
                 #if OUTPUT_REVIVE_CELLS
                     PRINT("\t\tRessurecting Cell (%ld, %ld) %d\n", curr_cell->y, curr_cell->x, num_bits);
                 #endif
+                // Reset Cells Neighbour Count
+                curr_cell->neighbours = 0;
+                // Add the Cell to the Alive Cells => Resurrect it
+                add_elem(&alive_cells, *curr_cell);
             } else {
                 #if TO_STDOUT == TRUE
                     temp_cell(num_bits, curr_cell->y, curr_cell->x);
@@ -519,8 +539,11 @@ void main_loop (const int steps) {
         #endif
 
         #if TO_STDOUT == TRUE
-            // TODO: Clear previous Console Output
-            curr_row = Y_OFFSET;
+            // Reset the Console
+            while (curr_row > Y_OFFSET) {
+                printf("\x1B[%d;%dH" CLEAR_TO_EOL, curr_row--, board_width + CONS_X_OFFSET);
+            }
+            // Remove the Temporary Cells which didn't resurrect
             curr_iter = Iter.iter(&temp_cells);
             curr_cell = Iter.next(&curr_iter);
             while (curr_cell != NULL) {
@@ -530,7 +553,9 @@ void main_loop (const int steps) {
         #endif
 
         // Reset Temporary Cells
-        temp_cells.num_elem = 0;
+        // TODO: Create seperate Function for this (which can deallocate the Chunks if specified)
+        // temp_cells.num_elem = 0;
+        reset(&temp_cells);
 
     }
 
@@ -702,7 +727,7 @@ int count_set_bits(struct Cell cell) {
     void setup_game_board(int height, int width) {
         printf("\x1B[?1049h\x1B[?25l");
         // Print Round Identifier
-        printf(MOVE_TO(0, 0) BLUE "Round 0:\n\n");
+        printf(MOVE_TO(1, 1) BLUE "Round 0:\n\n");
         // Setup Game Board
         for (int i = 0; i < height; i ++) {
             for (int j = 0; j < width; j ++) {
@@ -719,7 +744,7 @@ int count_set_bits(struct Cell cell) {
         struct Cell * c = Iter.next(&alive_iterator);
         while (c != NULL) {
             if (
-                (c->x >= 0) && (c->x < width) &&
+                (c->x >= 0) && (c->x < width ) &&
                 (c->y >= 0) && (c->y < height)
             ) {
                 resurrect_cell(c->neighbours, c->y, c->y);
@@ -730,6 +755,7 @@ int count_set_bits(struct Cell cell) {
 
 // -------------------------------------------------------------------------- //
 
+    // Helper Functions for overwriting Cells in the Grid
     #if DEBUG == TRUE
         void dying_cell(u8 count, int x, int y) {
             if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
@@ -760,7 +786,7 @@ int count_set_bits(struct Cell cell) {
         void dying_cell(u8 count, int x, int y) {
             UNUSED(count);
             if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
-                printf("\x1B[%d;%dH" BLUE " t", y + Y_OFFSET, (x * 2) + 1);
+                printf("\x1B[%d;%dH" BLUE " f", y + Y_OFFSET, (x * 2) + 1);
             }
         }
         void alive_cell(u8 count, int x, int y) {

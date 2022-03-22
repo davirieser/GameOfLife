@@ -8,7 +8,7 @@
 // ---------------------    ---------------------    ---------------------
 // cx  = Data Cell
 // *ci = Chunk Pointer Cell => Stores a Pointer to the next Chunk in
-//                             it's .x-Field.
+//                             it's CHUNK_POINTER_FIELD.
 //                             This is why the Chunk Pointer Index is one
 //                             less than the CHUNK_SIZE.
 //                             The last Chunk Pointer will be a NULL
@@ -17,7 +17,7 @@
 //
 // NOTE: I think I have too many safeguards/redundant safeguards implemented,
 //       but since this is not Rust, I thought better safe than sorry.
-
+// 
 // Usage Manual:
 //
 // Your Code needs to define a few Values for this Code to work:
@@ -285,6 +285,7 @@ int init_chunks (struct MemoryManager * m);
 int allocate_chunk(struct MemoryManager * m);
 static int deallocate_last_chunk (struct MemoryManager * m);
 void deallocate_chunks (struct MemoryManager * m);
+void reset(struct MemoryManager * m);
 static void deallocate_chunks_inner (Inner * c);
 int add_elem (struct MemoryManager * m, Inner c);
 int remove_elem (struct MemoryManager * m, long idx);
@@ -403,6 +404,21 @@ static void deallocate_chunks_inner (Inner * c) {
     free(c);
     c = NULL;
     return;
+}
+
+// -------------------------------------------------------------------------- //
+
+// Reset the MemoryManager, rmoving all Elements from it.
+void reset(struct MemoryManager * m) {
+    // Set the Number of Elements to 0 making them inaccessible
+    m->num_elem = 0;
+
+    #if DEALLOCATE_UNUSED_CHUNKS == TRUE
+        if ((Inner *) m->chunks[CHUNK_POINTER_IDX].CHUNK_POINTER_FIELD != NULL) {
+            // Deallocate all Chunks except the first one.
+            deallocate_chunks_inner((Inner *) m->chunks[CHUNK_POINTER_IDX].CHUNK_POINTER_FIELD);
+        }
+    #endif
 }
 
 // -------------------------------------------------------------------------- //
