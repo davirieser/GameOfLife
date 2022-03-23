@@ -98,16 +98,16 @@ void direction_test ();
 int compare_cells (struct Cell * self, struct Cell * other);
 void change_pos (long * x, long * y, u8 direction);
 void create_temp_cells (struct Cell * self, u8 directions);
-void create_gosper_gun(int x, int y);
 void printUsage(const char* programName);
 void create_glider(long y, long x);
+void create_gosper_gun (long y, long x);
 #if TO_STDOUT == TRUE
     void setup_game_board(int height, int width);
-    void resurrect_cell(u8 count, int x, int y);
-    void kill_cell(u8 count, int x, int y);
-    void temp_cell(u8 count, int x, int y);
-    void alive_cell(u8 count, int x, int y);
-    void dying_cell(u8 count, int x, int y);
+    void resurrect_cell(u8 count, int y, int x);
+    void kill_cell(u8 count, int y, int x);
+    void temp_cell(u8 count, int y, int x);
+    void alive_cell(u8 count, int y, int x);
+    void dying_cell(u8 count, int y, int x);
 #endif
 
 // -------------------------------------------------------------------------- //
@@ -252,28 +252,30 @@ void printUsage(const char* programName) {
         #endif
 
         // Create some Patterns
-        add_elem(&alive_cells, alive(1, 2));
-        add_elem(&alive_cells, alive(1, 3));
-        add_elem(&alive_cells, alive(1, 4));
+        // add_elem(&alive_cells, alive(1, 2));
+        // add_elem(&alive_cells, alive(1, 3));
+        // add_elem(&alive_cells, alive(1, 4));
+        //
+        // add_elem(&alive_cells, alive(10, 4));
+        // add_elem(&alive_cells, alive(10, 5));
+        // add_elem(&alive_cells, alive(10, 6));
+        //
+        // add_elem(&alive_cells, alive(17, 4));
+        // add_elem(&alive_cells, alive(17, 5));
+        // add_elem(&alive_cells, alive(18, 4));
+        // add_elem(&alive_cells, alive(18, 5));
+        //
+        // create_glider(5,25);
+        // create_glider(5,35);
+        // create_glider(15,15);
+        // create_glider(15,25);
+        // create_glider(15,35);
+        // create_glider(25,5);
+        // create_glider(25,15);
+        // create_glider(25,25);
+        // create_glider(25,35);
 
-        add_elem(&alive_cells, alive(10, 4));
-        add_elem(&alive_cells, alive(10, 5));
-        add_elem(&alive_cells, alive(10, 6));
-
-        add_elem(&alive_cells, alive(17, 4));
-        add_elem(&alive_cells, alive(17, 5));
-        add_elem(&alive_cells, alive(18, 4));
-        add_elem(&alive_cells, alive(18, 5));
-
-        create_glider(5,25);
-        create_glider(5,35);
-        create_glider(15,15);
-        create_glider(15,25);
-        create_glider(15,35);
-        create_glider(25,5);
-        create_glider(25,15);
-        create_glider(25,25);
-        create_glider(25,35);
+        create_gosper_gun(10, -10);
 
         main_loop(steps);
 
@@ -564,8 +566,6 @@ void main_loop (const int steps) {
         #endif
 
         // Reset Temporary Cells
-        // TODO: Create seperate Function for this (which can deallocate the Chunks if specified)
-        // temp_cells.num_elem = 0;
         reset(&temp_cells);
 
     }
@@ -771,57 +771,57 @@ int count_set_bits(struct Cell cell) {
 
     // Helper Functions for overwriting Cells in the Grid
     #if DEBUG == TRUE
-        void dying_cell(u8 count, int x, int y) {
+        void dying_cell(u8 count, int y, int x) {
             if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
                 printf("\x1B[%d;%dH" BLUE " %d", y + Y_OFFSET, (x * 2) + 1, count);
             }
         }
-        void alive_cell(u8 count, int x, int y) {
+        void alive_cell(u8 count, int y, int x) {
             if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
                 printf("\x1B[%d;%dH" GREEN " %d", y + Y_OFFSET, (x * 2) + 1, count);
             }
         }
-        void resurrect_cell(u8 count, int x, int y) {
+        void resurrect_cell(u8 count, int y, int x) {
             if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
                 printf("\x1B[%d;%dH" GREEN " %d", y + Y_OFFSET, (x * 2) + 1, count);
             }
         }
-        void kill_cell(u8 count, int x, int y) {
+        void kill_cell(u8 count, int y, int x) {
             if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
                 printf("\x1B[%d;%dH" RED " %d", y + Y_OFFSET, (x * 2) + 1, count);
             }
         }
-        void temp_cell(u8 count, int x, int y) {
+        void temp_cell(u8 count, int y, int x) {
             if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
                 printf("\x1B[%d;%dH" YELLOW " %d", y + Y_OFFSET, (x * 2) + 1, count);
             }
         }
     #else
-        void dying_cell(u8 count, int x, int y) {
+        void dying_cell(u8 count, int y, int x) {
             UNUSED(count);
             if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
                 printf("\x1B[%d;%dH" BLUE " f", y + Y_OFFSET, (x * 2) + 1);
             }
         }
-        void alive_cell(u8 count, int x, int y) {
+        void alive_cell(u8 count, int y, int x) {
             UNUSED(count);
             if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
                 printf("\x1B[%d;%dH" GREEN " t", y + Y_OFFSET, (x * 2) + 1);
             }
         }
-        void resurrect_cell(u8 count, int x, int y) {
+        void resurrect_cell(u8 count, int y, int x) {
             UNUSED(count);
             if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
                 printf("\x1B[%d;%dH" GREEN " t", y + Y_OFFSET, (x * 2) + 1);
             }
         }
-        void kill_cell(u8 count, int x, int y) {
+        void kill_cell(u8 count, int y, int x) {
             UNUSED(count);
             if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
                 printf("\x1B[%d;%dH" RED " f", y + Y_OFFSET, (x * 2) + 1);
             }
         }
-        void temp_cell(u8 count, int x, int y) {
+        void temp_cell(u8 count, int y, int x) {
             UNUSED(count);
             if ((y >= 0) && (y < board_height) && (x >= 0) && (x < board_width)) {
                 printf("\x1B[%d;%dH" YELLOW " x", y + Y_OFFSET, (x * 2) + 1);
@@ -839,6 +839,57 @@ void create_glider(long y, long x) {
     add_elem(&alive_cells, alive(y + 1, x + 2));
     add_elem(&alive_cells, alive(y + 2, x + 1));
     add_elem(&alive_cells, alive(y + 2, x + 2));
+}
+
+// -------------------------------------------------------------------------- //
+
+void create_gosper_gun (long y, long x) {
+
+    UNUSED(x);
+    UNUSED(y);
+
+    add_elem(&alive_cells, alive(y + 4, x + 0));
+    add_elem(&alive_cells, alive(y + 5, x + 0));
+    add_elem(&alive_cells, alive(y + 4, x + 1));
+    add_elem(&alive_cells, alive(y + 5, x + 1));
+
+    add_elem(&alive_cells, alive(y + 3, x + 11));
+    add_elem(&alive_cells, alive(y + 2, x + 12));
+    add_elem(&alive_cells, alive(y + 2, x + 13));
+    add_elem(&alive_cells, alive(y + 4, x + 10));
+    add_elem(&alive_cells, alive(y + 5, x + 10));
+    add_elem(&alive_cells, alive(y + 5, x + 14));
+    add_elem(&alive_cells, alive(y + 6, x + 10));
+    add_elem(&alive_cells, alive(y + 7, x + 11));
+    add_elem(&alive_cells, alive(y + 8, x + 12));
+    add_elem(&alive_cells, alive(y + 8, x + 13));
+
+    add_elem(&alive_cells, alive(y + 3, x + 15));
+    add_elem(&alive_cells, alive(y + 4, x + 16));
+    add_elem(&alive_cells, alive(y + 5, x + 16));
+    add_elem(&alive_cells, alive(y + 5, x + 17));
+    add_elem(&alive_cells, alive(y + 6, x + 16));
+    add_elem(&alive_cells, alive(y + 7, x + 15));
+
+    add_elem(&alive_cells, alive(y + 2, x + 20));
+    add_elem(&alive_cells, alive(y + 3, x + 20));
+    add_elem(&alive_cells, alive(y + 4, x + 20));
+    add_elem(&alive_cells, alive(y + 2, x + 21));
+    add_elem(&alive_cells, alive(y + 3, x + 21));
+    add_elem(&alive_cells, alive(y + 4, x + 21));
+    add_elem(&alive_cells, alive(y + 1, x + 22));
+    add_elem(&alive_cells, alive(y + 5, x + 22));
+
+    add_elem(&alive_cells, alive(y + 0, x + 24));
+    add_elem(&alive_cells, alive(y + 1, x + 24));
+    add_elem(&alive_cells, alive(y + 5, x + 24));
+    add_elem(&alive_cells, alive(y + 6, x + 24));
+
+    add_elem(&alive_cells, alive(y + 3, x + 34));
+    add_elem(&alive_cells, alive(y + 3, x + 35));
+    add_elem(&alive_cells, alive(y + 4, x + 34));
+    add_elem(&alive_cells, alive(y + 4, x + 35));
+
 }
 
 // -------------------------------------------------------------------------- //

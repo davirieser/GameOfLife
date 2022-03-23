@@ -9,7 +9,7 @@ X=50
 Y=40
 DELAY=1
 DENSITY=0.3
-STEPS=100
+STEPS=500
 
 CFLAGS=-std=c11 -Wall -Wextra -Werror -O -g -fsanitize=leak
 

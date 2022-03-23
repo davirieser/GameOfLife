@@ -42,7 +42,7 @@
         return cell;
     }
     // Create a more fitting Alias function
-    struct Cell (*new_cell) (long x, long y) = &alive;
+    struct Cell (*new_cell) (long y, long x) = &alive;
 #endif
 
 // -------------------------------------------------------------------------- //
