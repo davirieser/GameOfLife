@@ -5,7 +5,6 @@
 
 // -------------------------------------------------------------------------- //
 
-#define CHUNK_SIZE 5
 #define INNER_STRUCT struct Cell
 #define CHUNK_POINTER_FIELD x
 
@@ -16,16 +15,16 @@
 #define TO_STDOUT TRUE
 
 #undef DEBUG
-#define DEBUG FALSE
+#define DEBUG TRUE
 
 #ifndef DEBUG
-    #define DEBUG TRUE
+    #define DEBUG FALSE
 #endif
 #if DEBUG == TRUE
     #define OUTPUT_ITERATOR FALSE
     #define OUTPUT_CREATE_TEMP FALSE
-    #define OUTPUT_REVIVE_CELLS TRUE
-    #define OUTPUT_KILL_CELLS TRUE
+    #define OUTPUT_REVIVE_CELLS FALSE
+    #define OUTPUT_KILL_CELLS FALSE
     #define OUTPUT_COMPARE FALSE
     #define OUTPUT_NEIGHBOURS FALSE
 #endif
@@ -59,6 +58,8 @@
 // This Macro can only be used for Cursor Movements known at Compile Time
 #define MOVE_TO(x,y) "\x1B[" stringify(y) ";" stringify(x) "H"
 #define CLEAR_TO_EOL "\x1B[0K"
+
+// -------------------------------------------------------------------------- //
 
 #if TO_STDOUT == TRUE
     #define PRINT(...) ( \
@@ -99,6 +100,7 @@ void change_pos (long * x, long * y, u8 direction);
 void create_temp_cells (struct Cell * self, u8 directions);
 void create_gosper_gun(int x, int y);
 void printUsage(const char* programName);
+void create_glider(long y, long x);
 #if TO_STDOUT == TRUE
     void setup_game_board(int height, int width);
     void resurrect_cell(u8 count, int x, int y);
@@ -263,12 +265,15 @@ void printUsage(const char* programName) {
         add_elem(&alive_cells, alive(18, 4));
         add_elem(&alive_cells, alive(18, 5));
 
-        // TODO: Something is wrong when trying to use a Glider:
-        // add_elem(&alive_cells, alive(4, 8));
-        // add_elem(&alive_cells, alive(5, 9));
-        // add_elem(&alive_cells, alive(6, 8));
-        // add_elem(&alive_cells, alive(6, 9));
-        // add_elem(&alive_cells, alive(6, 10));
+        create_glider(5,25);
+        create_glider(5,35);
+        create_glider(15,15);
+        create_glider(15,25);
+        create_glider(15,35);
+        create_glider(25,5);
+        create_glider(25,15);
+        create_glider(25,25);
+        create_glider(25,35);
 
         main_loop(steps);
 
@@ -487,7 +492,7 @@ void main_loop (const int steps) {
                     resurrect_cell(num_bits, curr_cell->y, curr_cell->x);
                 #endif
                 #if OUTPUT_REVIVE_CELLS == TRUE
-                    PRINT("\t\tSurviving Cell: (%ld, %ld) %d\n", curr_cell->y, curr_cell->x, num_bits);
+                    PRINT(GREEN "\t\tSurviving Cell: (%ld, %ld) %d\n", curr_cell->y, curr_cell->x, num_bits);
                 #endif
                 // Reset Cells Neighbour Count
                 curr_cell->neighbours = 0;
@@ -496,6 +501,9 @@ void main_loop (const int steps) {
             } else {
                 #if TO_STDOUT == TRUE
                     dying_cell(num_bits, curr_cell->y, curr_cell->x);
+                #endif
+                #if OUTPUT_REVIVE_CELLS == TRUE
+                    PRINT(BLUE "\t\tDying Cell: (%ld, %ld) %d\n", curr_cell->y, curr_cell->x, num_bits);
                 #endif
                 // Unalive the Cell
                 remove_elem(&alive_cells, curr_iter.curr_idx - 1);
@@ -516,12 +524,15 @@ void main_loop (const int steps) {
                     alive_cell(num_bits, curr_cell->y, curr_cell->x);
                 #endif
                 #if OUTPUT_REVIVE_CELLS
-                    PRINT("\t\tRessurecting Cell (%ld, %ld) %d\n", curr_cell->y, curr_cell->x, num_bits);
+                    PRINT(GREEN "\t\tRessurecting Cell (%ld, %ld) %d\n", curr_cell->y, curr_cell->x, num_bits);
                 #endif
                 // Reset Cells Neighbour Count
                 curr_cell->neighbours = 0;
                 // Add the Cell to the Alive Cells => Resurrect it
-                add_elem(&alive_cells, *curr_cell);
+                if (add_elem(&alive_cells, *curr_cell) < 0) {
+                    PRINT(RED "ERROR: No more Memory");
+                    return;
+                }
             } else {
                 #if TO_STDOUT == TRUE
                     temp_cell(num_bits, curr_cell->y, curr_cell->x);
@@ -620,7 +631,10 @@ void create_temp_cells (struct Cell * self, u8 directions) {
             // Set the Neighbour Field in that Cell
             c.neighbours = reverse;
 
-            add_elem(&temp_cells, c);
+            if (add_elem(&temp_cells, c) == -1) {
+                PRINT(RED "ERROR: No more Memory");
+                return;
+            }
 
             #if OUTPUT_CREATE_TEMP == TRUE
                 PRINT(GREEN "\t\t\tCreating Temp Cell at (%ld, %ld)\n", y, x);
@@ -816,5 +830,15 @@ int count_set_bits(struct Cell cell) {
     #endif
 
 #endif
+
+// -------------------------------------------------------------------------- //
+
+void create_glider(long y, long x) {
+    add_elem(&alive_cells, alive(y, x + 2));
+    add_elem(&alive_cells, alive(y + 1, x));
+    add_elem(&alive_cells, alive(y + 1, x + 2));
+    add_elem(&alive_cells, alive(y + 2, x + 1));
+    add_elem(&alive_cells, alive(y + 2, x + 2));
+}
 
 // -------------------------------------------------------------------------- //
