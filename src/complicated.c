@@ -21,12 +21,24 @@
     #define DEBUG FALSE
 #endif
 #if DEBUG == TRUE
-    #define OUTPUT_ITERATOR FALSE
-    #define OUTPUT_CREATE_TEMP FALSE
-    #define OUTPUT_REVIVE_CELLS FALSE
-    #define OUTPUT_KILL_CELLS FALSE
-    #define OUTPUT_COMPARE FALSE
-    #define OUTPUT_NEIGHBOURS FALSE
+    #ifndef OUTPUT_ITERATOR
+        #define OUTPUT_ITERATOR FALSE
+    #endif
+    #ifndef OUTPUT_CREATE_TEMP
+        #define OUTPUT_CREATE_TEMP FALSE
+    #endif
+    #ifndef OUTPUT_REVIVE_CELLS
+        #define OUTPUT_REVIVE_CELLS FALSE
+    #endif
+    #ifndef OUTPUT_KILL_CELLS
+        #define OUTPUT_KILL_CELLS FALSE
+    #endif
+    #ifndef OUTPUT_COMPARE
+        #define OUTPUT_COMPARE FALSE
+    #endif
+    #ifndef OUTPUT_NEIGHBOURS
+        #define OUTPUT_NEIGHBOURS FALSE
+    #endif
 #endif
 
 // -------------------------------------------------------------------------- //
@@ -252,30 +264,30 @@ void printUsage(const char* programName) {
         #endif
 
         // Create some Patterns
-        // add_elem(&alive_cells, alive(1, 2));
-        // add_elem(&alive_cells, alive(1, 3));
-        // add_elem(&alive_cells, alive(1, 4));
-        //
-        // add_elem(&alive_cells, alive(10, 4));
-        // add_elem(&alive_cells, alive(10, 5));
-        // add_elem(&alive_cells, alive(10, 6));
-        //
-        // add_elem(&alive_cells, alive(17, 4));
-        // add_elem(&alive_cells, alive(17, 5));
-        // add_elem(&alive_cells, alive(18, 4));
-        // add_elem(&alive_cells, alive(18, 5));
-        //
-        // create_glider(5,25);
-        // create_glider(5,35);
-        // create_glider(15,15);
-        // create_glider(15,25);
-        // create_glider(15,35);
-        // create_glider(25,5);
-        // create_glider(25,15);
-        // create_glider(25,25);
-        // create_glider(25,35);
+        add_elem(&alive_cells, alive(1, 2));
+        add_elem(&alive_cells, alive(1, 3));
+        add_elem(&alive_cells, alive(1, 4));
 
-        create_gosper_gun(10, -10);
+        add_elem(&alive_cells, alive(10, 4));
+        add_elem(&alive_cells, alive(10, 5));
+        add_elem(&alive_cells, alive(10, 6));
+
+        add_elem(&alive_cells, alive(17, 4));
+        add_elem(&alive_cells, alive(17, 5));
+        add_elem(&alive_cells, alive(18, 4));
+        add_elem(&alive_cells, alive(18, 5));
+
+        create_glider(5,25);
+        create_glider(5,35);
+        create_glider(15,15);
+        create_glider(15,25);
+        create_glider(15,35);
+        create_glider(25,5);
+        create_glider(25,15);
+        create_glider(25,25);
+        create_glider(25,35);
+
+        // create_gosper_gun(10, -10);
 
         main_loop(steps);
 

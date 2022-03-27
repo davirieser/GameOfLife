@@ -17,7 +17,7 @@
 //
 // NOTE: I think I have too many safeguards/redundant safeguards implemented,
 //       but since this is not Rust, I thought better safe than sorry.
-// 
+//
 // Usage Manual:
 //
 // Your Code needs to define a few Values for this Code to work:
@@ -114,6 +114,7 @@ struct MemoryIterator {
 // -------------------------------------------------------------------------- //
 
 static struct MemoryIterator to_iter(struct MemoryManager * m) {
+    if (m == NULL) return NULL;
     struct MemoryIterator i = {
         .chunks = m->chunks,
         .num_elem = &m->num_elem,
@@ -129,6 +130,7 @@ static struct MemoryIterator to_iter(struct MemoryManager * m) {
 // Returns NULL if all Elements where already returned.
 // Resolves Chunk Pointers once it has reached the Chunk Pointer.
 static Inner * next (struct MemoryIterator * i) {
+    if (i == NULL) return NULL;
     // Check that the Iterator is still in the allocated Memory.
     if (i->curr_idx < *i->num_elem) {
         // Check if the current Element is the Chunk Pointer
@@ -156,6 +158,7 @@ static Inner * next (struct MemoryIterator * i) {
 // Returns NULL if all Elements where already returned.
 // Resolves Chunk Pointers.
 static Inner * peek (struct MemoryIterator * i) {
+    if (i == NULL) return NULL;
     // Check that the Iterator is still in the allocated Memory.
     if (i->curr_idx <= *(i->num_elem)) {
         // Check if the current Element is the Chunk Pointer
@@ -183,6 +186,7 @@ static Inner * peek (struct MemoryIterator * i) {
 // Because this is a single Linked List this only works until it is at the
 // start of the Chunk. Once it is at the start of the Chunk it returns NULL.
 static Inner * next_back (struct MemoryIterator * i) {
+    if (i == NULL) return NULL;
     // Check that the Iterator is still in the allocated Memory.
     if ((i->curr_idx - 1) < *(i->num_elem)) {
         // Check if the Index is at the start of the Chunk.
@@ -200,6 +204,7 @@ static Inner * next_back (struct MemoryIterator * i) {
 // Returns NULL if all Elements where already returned.
 // Resolves Chunk Pointers and leaves the Iterator unchanged.
 static Inner * previous (struct MemoryIterator * i) {
+    if (i == NULL) return NULL;
     // Check that the Iterator is still in the allocated Memory.
     if ((i->curr_idx - 1) < *(i->num_elem)) {
         // Check if the Index is at the start of the Chunk.
@@ -232,6 +237,7 @@ static Inner * previous (struct MemoryIterator * i) {
 // -------------------------------------------------------------------------- //
 
 static struct MemoryIterator clone_iter (struct MemoryIterator * i) {
+    if (i == NULL) return NULL;
     struct MemoryIterator clone = {
         .chunks = i->chunks,
         .num_elem = i->num_elem,
@@ -245,6 +251,7 @@ static struct MemoryIterator clone_iter (struct MemoryIterator * i) {
 
 // Call a Closure on each Iterator Element.
 static void for_each (struct MemoryIterator * i, void (*func)(Inner *)) {
+    if (i == NULL) return NULL;
     Inner * inner = next(i);
     while (inner != NULL) {
         func(inner);
@@ -300,6 +307,7 @@ void print_chunk_pointers(struct MemoryManager m);
 
 // Allocate initial Memory Chunks
 int init_chunks (struct MemoryManager * m) {
+    if (m == NULL) return -1;
 
     // Allocate Memory for the alive Cells.
     void * chunk = malloc (CHUNK_SIZE * sizeof(Inner));
@@ -325,6 +333,7 @@ int init_chunks (struct MemoryManager * m) {
 // -------------------------------------------------------------------------- //
 
 int allocate_chunk(struct MemoryManager * m) {
+    if (m == NULL) return -1;
     // Allocate new Chunk
     Inner * new_chunk = malloc(CHUNK_SIZE * sizeof(Inner));
     // Check that the Memory has been allocated.
@@ -351,6 +360,7 @@ int allocate_chunk(struct MemoryManager * m) {
 
 // Private Helper Funtion for remove_cell
 static int deallocate_last_chunk (struct MemoryManager * m) {
+    if (m == NULL) return -1;
     // Get the last Chunk Pointer which shouldn't contain
     // any more Data.
     Inner * p1 = get_chunk_pointer(*m, m->allocated_chunks - 1);
@@ -374,6 +384,7 @@ static int deallocate_last_chunk (struct MemoryManager * m) {
 
 // Free all Allocated Memory of a MemoryManager
 void deallocate_chunks (struct MemoryManager * m) {
+    if (m == NULL) return;
     deallocate_chunks_inner(m->chunks);
 }
 
@@ -381,6 +392,7 @@ void deallocate_chunks (struct MemoryManager * m) {
 // This takes a reference to a Cell-Array and recursively frees all
 // chunks which are allocated in it.
 static void deallocate_chunks_inner (Inner * c) {
+    if (c == NULL) return;
     // Check if the passed Pointer is the last Chunk Pointer
     // If a chunk is allocated after this skip the If-Block.
     if ((Inner *) c[CHUNK_POINTER_IDX].CHUNK_POINTER_FIELD == NULL) {
@@ -410,6 +422,7 @@ static void deallocate_chunks_inner (Inner * c) {
 
 // Reset the MemoryManager, rmoving all Elements from it.
 void reset(struct MemoryManager * m) {
+    if (m == NULL) return;
     // Set the Number of Elements to 0 making them inaccessible
     m->num_elem = 0;
 
@@ -427,6 +440,7 @@ void reset(struct MemoryManager * m) {
 // Returns  0 if Operation succeded.
 // Returns -1 if no Space could be allocated anymore
 int add_elem (struct MemoryManager * m, Inner c) {
+    if (m == NULL) return -1;
     // This needs to use get_elem_inner because it has to bypass the
     // Index Check in get_elem.
     // The Index Check in get_elem is supposed to catch Users trying to
@@ -458,6 +472,7 @@ int add_elem (struct MemoryManager * m, Inner c) {
 // This is possible because the order of the cells
 // does not matter.
 int remove_elem (struct MemoryManager * m, long idx) {
+    if (m == NULL) return -1;
     // Check that the Cell which is trying to be removed is actually
     // allocated.
     if ((idx < 0) || (idx >= m->num_elem)) return -1;
